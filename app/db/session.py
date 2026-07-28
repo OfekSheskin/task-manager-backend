@@ -8,9 +8,10 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def get_db():
-    """FastAPI dependency that yields a DB session per request and closes it after."""
     db = SessionLocal()
     try:
         yield db
+        engine = create_engine(settings.database_url, echo=True)
+
     finally:
         db.close()
