@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.core.security import hash_password, create_access_token, verify_password
 from app.schemas.user_schemas import Token, UserCreate
+from app.services.label_service import create_default_labels
 
 
 def register_user(db: Session, user: UserCreate) -> models.User:#function takes user schema and input checks if its in the database if not it hashes the password and adds the user to the database
@@ -21,6 +22,8 @@ def register_user(db: Session, user: UserCreate) -> models.User:#function takes 
         password_hash=hash_password(user.password),
     )
     db.add(new_user)
+    db.flush()  # assigns new_user.user_id without ending the transaction
+    create_default_labels(db, new_user.user_id)
     db.commit()
     db.refresh(new_user)
     return new_user
