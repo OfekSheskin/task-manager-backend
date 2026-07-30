@@ -11,7 +11,6 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
-        engine = create_engine(settings.database_url, echo=True)
 
     finally:
         db.close()
