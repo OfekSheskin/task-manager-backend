@@ -12,12 +12,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def registeruser(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+def register(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     return register_user(db, user)
 
 
 @router.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
-def loginuser(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+def login(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
     return login_user(db, user)
 
 
