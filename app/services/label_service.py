@@ -14,11 +14,7 @@ DEFAULT_LABELS: list[tuple[str, str]] = [
 
 
 def create_default_labels(db: Session, user_id: int) -> list[models.Label]:
-    """Create the default label set for a newly registered user.
 
-    Flushes instead of committing so the labels are part of the same transaction
-    as the user row: if registration fails afterwards, neither is written.
-    """
     labels = [
         models.Label(label_name=name, label_color=color, user_id=user_id)
         for name, color in DEFAULT_LABELS

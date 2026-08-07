@@ -10,7 +10,7 @@ from app.db.session import get_db
 
 bearer_scheme = HTTPBearer()
 
-
+#gets the current user from the database using the jwt token and returns it
 def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
     db: Annotated[Session, Depends(get_db)],
