@@ -1,16 +1,11 @@
 
 from datetime import date
-from enum import Enum, auto
-from sqlalchemy import Date, String, func, ForeignKey, Text
+from sqlalchemy import Date, String, func, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Enum as SQLEnum
 from app.db.base import Base
+from app.core.status import Status
 
 
-class Status(Enum):
-    TO_DO = auto()
-    DONE = auto()
-    CANCELLED = auto()
 
 
 class Task(Base):
@@ -18,7 +13,7 @@ class Task(Base):
 
     task_id: Mapped[int] = mapped_column(primary_key=True)
     task_title: Mapped[str] = mapped_column(String(255), index=True)
-    task_info:  Mapped[str] = mapped_column(Text)
+    task_info:  Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[date] = mapped_column(
         Date, server_default=func.current_date()
     )
