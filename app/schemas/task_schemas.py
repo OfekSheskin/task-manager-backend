@@ -9,9 +9,20 @@ class TaskBase(BaseModel):
     parent_task_id: int | None = None
 
 
+class TaskUpdate(BaseModel):
+    # Every field is optional: a PATCH body carries only what changes.
+    task_title: str | None = Field(default=None, min_length=1, max_length=255)
+    task_info: str | None = None
+    status: Status | None = None
+    parent_task_id: int | None = None
+    cancel_reason: str | None =  Field(default=None,max_length= 100)
+
 
 class TaskCreate(TaskBase):
     pass
+
+
+
 
 
 class TaskResponse(TaskBase):
