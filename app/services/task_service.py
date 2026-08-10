@@ -115,12 +115,33 @@ def _apply_status_change(
             detail="a status cannot be null"
         )
     if new_status == Status.DONE:
+        #check if a task has a subtask whos not done before setting it to done.
+        unfinished_child = db.execute(select(models.Task).where(
+            models.Task.parent_task_id == task.task_id,
+            models.Task.status == Status.TO_DO,
+        )).scalars().first()
+        if unfinished_child is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A task cannot be set to done if one of its children is not done"
+            )
         task.done_date = date.today()
         return
 
     if new_status == Status.TO_DO:
+        if task.parent_task_id is None:
+            task.done_date = None
+            return  
+        parent = db.get(models.Task, task.parent_task_id)
+        if parent.status == Status.DONE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A task cannot be set to to do if his parent is already done"
+            )
         task.done_date = None
-        return
+        return  
+
+
 
     if new_status == Status.CANCELLED:
         task.done_date = None
