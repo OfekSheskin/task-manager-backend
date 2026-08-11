@@ -136,7 +136,7 @@ def _apply_status_change(
         if parent.status == Status.DONE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A task cannot be set to to do if his parent is already done"
+                detail="A task cannot be set to to do if its parent is already done"
             )
         task.done_date = None
         return  
@@ -145,7 +145,19 @@ def _apply_status_change(
 
     if new_status == Status.CANCELLED:
         task.done_date = None
-
+        _cascade_cancel(db, task)
         return
+
+
+def _cascade_cancel(db: Session, task: models.Task) -> None:
+    children = db.execute(
+        select(models.Task).where(models.Task.parent_task_id == task.task_id)
+    ).scalars().all()
+
+    for child in children:
+        child.status = Status.CANCELLED
+        child.done_date = None
+        _cascade_cancel(db, child)
+
 
 
