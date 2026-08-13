@@ -1,7 +1,7 @@
 from pydantic import Field
 from datetime import date
 from pydantic import BaseModel, ConfigDict
-from app.core.status import Status
+from app.core.status import TaskStatus
 
 class TaskBase(BaseModel):
     task_title: str = Field(min_length=1, max_length=255)
@@ -13,7 +13,7 @@ class TaskUpdate(BaseModel):
     # Every field is optional: a PATCH body carries only what changes.
     task_title: str | None = Field(default=None, min_length=1, max_length=255)
     task_info: str | None = None
-    status: Status | None = None
+    status: TaskStatus | None = None
     parent_task_id: int | None = None
     cancel_reason: str | None =  Field(default=None,max_length= 100)
 
@@ -28,7 +28,7 @@ class TaskCreate(TaskBase):
 class TaskResponse(TaskBase):
     model_config = ConfigDict(from_attributes=True)
     task_id: int
-    status: Status
+    status: TaskStatus
     created_at: date
     done_date: date | None
     cancel_reason: str | None

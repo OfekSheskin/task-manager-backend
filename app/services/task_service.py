@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import date
 from app import models
 from app.schemas.task_schemas import TaskCreate, TaskUpdate
-from app.core.status import Status
+from app.core.status import TaskStatus
 
 
 def get_task(db: Session, user: models.User, task_id: int) -> models.Task:
@@ -114,11 +114,11 @@ def _apply_status_change(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="a status cannot be null"
         )
-    if new_status == Status.DONE:
+    if new_status == TaskStatus.DONE:
         #check if a task has a subtask whos not done before setting it to done.
         unfinished_child = db.execute(select(models.Task).where(
             models.Task.parent_task_id == task.task_id,
-            models.Task.status == Status.TO_DO,
+            models.Task.status == TaskStatus.TO_DO,
         )).scalars().first()
         if unfinished_child is not None:
             raise HTTPException(
@@ -128,12 +128,12 @@ def _apply_status_change(
         task.done_date = date.today()
         return
 
-    if new_status == Status.TO_DO:
+    if new_status == TaskStatus.TO_DO:
         if task.parent_task_id is None:
             task.done_date = None
             return  
         parent = db.get(models.Task, task.parent_task_id)
-        if parent.status == Status.DONE:
+        if parent.status == TaskStatus.DONE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A task cannot be set to to do if its parent is already done"
@@ -143,7 +143,7 @@ def _apply_status_change(
 
 
 
-    if new_status == Status.CANCELLED:
+    if new_status == TaskStatus.CANCELLED:
         task.done_date = None
         _cascade_cancel(db, task)
         return
@@ -155,7 +155,7 @@ def _cascade_cancel(db: Session, task: models.Task) -> None:
     ).scalars().all()
 
     for child in children:
-        child.status = Status.CANCELLED
+        child.status = TaskStatus.CANCELLED
         child.done_date = None
         _cascade_cancel(db, child)
 

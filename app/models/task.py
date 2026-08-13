@@ -3,7 +3,7 @@ from datetime import date
 from sqlalchemy import Date, String, func, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
-from app.core.status import Status
+from app.core.status import TaskStatus
 
 
 
@@ -17,7 +17,7 @@ class Task(Base):
     created_at: Mapped[date] = mapped_column(
         Date, server_default=func.current_date()
     )
-    status: Mapped[Status] = mapped_column(SQLEnum(Status), default=Status.TO_DO, index=True)
+    status: Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus), default=TaskStatus.TO_DO, index=True)
     cancel_reason: Mapped[str | None] = mapped_column(String(100))
     done_date: Mapped[date | None] = mapped_column(
         Date

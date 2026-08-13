@@ -1,14 +1,7 @@
-from enum import Enum, auto
-
 from sqlalchemy import CheckConstraint, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-
+from app.core.status import FriendshipStatus
 from app.db.base import Base
-
-
-class FriendshipStatus(Enum):
-    PENDING = auto()
-    ACCEPTED = auto()
 
 
 class Friendship(Base):
