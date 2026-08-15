@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app import models
-from app.schemas.friendship_schemas import FriendshipCreate
-from sqlalchemy import or_, select, and_
+from app.schemas.friendship_schemas import FriendshipCreate, FriendshipUpdate
+from sqlalchemy import case, or_, select, and_
 from fastapi import HTTPException, status
 from app.core.status import FriendshipStatus
 
@@ -32,10 +32,16 @@ def friendship_request_create(db: Session, user: models.User, friendship: Friend
         )
     ).scalars().first()
     if existing_friendship is not None:# check if the friendship request already exists
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "the friendship request already exists"
-        )
+        if existing_friendship.status != FriendshipStatus.DENIED:
+           raise HTTPException(
+             status_code=status.HTTP_400_BAD_REQUEST,
+             detail= "the friendship request already exists"
+            )
+        # a denied pair may be re-requested. drop the old row and flush so the DELETE
+        # is emitted before the INSERT below - the unit of work would otherwise order
+        # the INSERT first and collide on the composite primary key.
+        db.delete(existing_friendship)
+        db.flush()
 
     new_friendship = models.Friendship(
         requester_id =  user.user_id,
@@ -55,3 +61,60 @@ def get_pending_requests(db: Session, user: models.User) -> list[models.Friendsh
             )
     ).scalars().all()
     return list(pending_requests)
+
+def get_friends(db: Session, user: models.User) -> list[models.User]:
+
+    friend_id = case(
+        (models.Friendship.requester_id == user.user_id, models.Friendship.addressee_id),
+        else_=models.Friendship.requester_id,
+    )
+
+    friends = db.execute(
+        select(models.User)
+        .join(models.Friendship, models.User.user_id == friend_id)
+        .where(
+            or_(
+                models.Friendship.requester_id == user.user_id,
+                models.Friendship.addressee_id == user.user_id,
+            ),
+            models.Friendship.status == FriendshipStatus.APPROVED,
+        )
+        .order_by(models.User.username)
+    ).scalars().all()
+    return list(friends)
+def friendship_request_or_deny(db: Session, user: models.User, user_id: int, friendship: FriendshipUpdate )-> models.Friendship:
+    if user.user_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail= "the request user and addressee can't be the same person",
+        )
+
+    if friendship.status == FriendshipStatus.PENDING:
+         raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "the friendship is already approved or denied",
+        )
+    pending_request = db.execute(
+        select(models.Friendship).where(
+            models.Friendship.addressee_id == user.user_id,
+            models.Friendship.requester_id == user_id,
+            models.Friendship.status == FriendshipStatus.PENDING
+        )
+    ).scalars().first()
+    if pending_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail= "friendship request doesn't exist",
+        )
+    data = friendship.model_dump(exclude_unset=True)
+
+    for field, value in data.items():
+        setattr(pending_request, field, value)
+
+    db.commit()
+    return pending_request
+
+
+
+    
+    
