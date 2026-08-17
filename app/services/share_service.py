@@ -2,14 +2,14 @@ from sqlalchemy.orm import Session
 from app import models
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from app.services.task_service import get_task
+from app.services.task_service import get_owned_task
 from app.schemas.share_schemas import ShareCreate
 from sqlalchemy import  or_, select, and_
 from app.core.status import FriendshipStatus
 
 
 def share_task(db: Session, user: models.User,task_id:int, share:ShareCreate) -> models.TaskShare:
-   task= get_task(db,user,task_id)#check if the task exists and user owns it. returns 404 if not.
+   task= get_owned_task(db,user,task_id)#check if the task exists and user owns it. returns 404 if not.
 
    if task.parent_task_id is not None: # check if the shared task is the root task
         raise HTTPException(
