@@ -129,7 +129,7 @@ def remove_friend(db: Session, user: models.User,friend_id:int) -> None:
             detail= "friendship doesn't exist or isnt approved yet",
         )
 
-    shared_task = db.execute(
+    shared_task = db.execute( # find all the shared tasks on this friend ship and if one exist friendship cant be deleted
         select(models.TaskShare.shared_task_id)
         .join(models.Task, models.Task.task_id == models.TaskShare.shared_task_id)
         .where(
