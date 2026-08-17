@@ -9,6 +9,7 @@ from app.services.friendship_service import (
     get_pending_requests,
     get_friends,
     friendship_request_or_deny,
+    remove_friend
 )
 
 
@@ -31,4 +32,9 @@ def request(user: CurrentUser, friendship: FriendshipCreate, db: Annotated[Sessi
 @router.patch("/{requester_id}", response_model=FriendshipResponse, status_code= status.HTTP_200_OK)
 def accept_or_deny_request(requester_id: int, friendship: FriendshipUpdate, user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     return friendship_request_or_deny(db,user,requester_id,friendship)
+
+@router.delete("/{friend_id}", status_code=status.HTTP_204_NO_CONTENT )
+def delete_friendship(friend_id: int, user: CurrentUser, db: Annotated[Session,Depends(get_db)]):
+    return remove_friend(db,user,friend_id)
+
 

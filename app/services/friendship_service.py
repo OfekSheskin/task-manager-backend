@@ -37,9 +37,7 @@ def friendship_request_create(db: Session, user: models.User, friendship: Friend
              status_code=status.HTTP_400_BAD_REQUEST,
              detail= "the friendship request already exists"
             )
-        # a denied pair may be re-requested. drop the old row and flush so the DELETE
-        # is emitted before the INSERT below - the unit of work would otherwise order
-        # the INSERT first and collide on the composite primary key.
+
         db.delete(existing_friendship)
         db.flush()
 
@@ -113,6 +111,48 @@ def friendship_request_or_deny(db: Session, user: models.User, user_id: int, fri
 
     db.commit()
     return pending_request
+def remove_friend(db: Session, user: models.User,friend_id:int) -> None:
+
+    existing_friendship = db.execute(
+        select(models.Friendship).where(
+            or_(
+                and_(models.Friendship.requester_id == user.user_id, models.Friendship.addressee_id == friend_id),
+                and_(models.Friendship.requester_id == friend_id, models.Friendship.addressee_id == user.user_id),
+            ),
+            models.Friendship.status == FriendshipStatus.APPROVED
+        )
+    ).scalars().first()
+
+    if existing_friendship is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail= "friendship doesn't exist or isnt approved yet",
+        )
+
+    shared_task = db.execute(
+        select(models.TaskShare.shared_task_id)
+        .join(models.Task, models.Task.task_id == models.TaskShare.shared_task_id)
+        .where(
+            or_(
+                and_(models.Task.owner_id == user.user_id, models.TaskShare.shared_user_id == friend_id),
+                and_(models.Task.owner_id == friend_id, models.TaskShare.shared_user_id == user.user_id),
+            )
+        )
+        .limit(1)
+    ).scalars().first()
+
+    if shared_task is not None:# friends can't be removed while a task is shared between them
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail= "you cannot remove a friend while you share a task",
+        )
+
+    db.delete(existing_friendship)
+    db.commit()
+
+
+
+
 
 
 
