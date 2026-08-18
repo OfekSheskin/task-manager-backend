@@ -14,7 +14,6 @@ class TaskUpdate(BaseModel):
     task_title: str | None = Field(default=None, min_length=1, max_length=255)
     task_info: str | None = None
     status: TaskStatus | None = None
-    parent_task_id: int | None = None
     cancel_reason: str | None =  Field(default=None,max_length= 100)
 
 

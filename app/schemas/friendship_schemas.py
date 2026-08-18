@@ -21,7 +21,6 @@ class FriendshipResponse(FriendshipBase):
     status: FriendshipStatus
 
 class FriendResponse(BaseModel):
-    """The *other* user in an approved friendship, from the current user's side."""
     model_config = ConfigDict(from_attributes=True)
     user_id: int
     username: str
