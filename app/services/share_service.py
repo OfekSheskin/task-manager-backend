@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app import models
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from app.services.task_service import get_owned_task
+from app.services.task_service import get_owned_task, get_task
 from app.schemas.share_schemas import ShareCreate
 from sqlalchemy import  or_, select, and_
 from app.core.status import FriendshipStatus
@@ -66,8 +66,37 @@ def share_task(db: Session, user: models.User,task_id:int, share:ShareCreate) ->
    db.commit()
    db.refresh(new_share)
    return new_share
-   
 
 
+def unshare_task(db: Session, user: models.User, task_id: int, shared_user_id: int) -> None:
+    get_owned_task(db, user, task_id)#check if the task exists and user owns it. returns 404 if not.
 
-    
+    existing_share = db.execute(
+        select(models.TaskShare).where(
+             models.TaskShare.shared_task_id == task_id,
+             models.TaskShare.shared_user_id == shared_user_id
+        )
+    ).scalars().first()
+
+    if existing_share is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="task is not shared with that user",
+        )
+    db.delete(existing_share)
+    db.commit()
+
+
+def list_shares(db: Session, user: models.User, task_id: int) -> list[models.User]:
+    get_task(db, user, task_id)#404 if the task doesn't exist, 403 if it isn't the user's or shared with them.
+
+    # Joined with task_shares so the rows come back as full User entities:
+    # the response needs usernames, not the bare ids stored on the share row.
+    shared_users = db.execute(
+        select(models.User)
+        .join(models.TaskShare, models.TaskShare.shared_user_id == models.User.user_id)
+        .where(models.TaskShare.shared_task_id == task_id)
+        .order_by(models.User.username)
+    ).scalars().all()
+
+    return list(shared_users)

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app import models
 from app.schemas.friendship_schemas import FriendshipCreate, FriendshipUpdate
-from sqlalchemy import case, or_, select, and_
+from sqlalchemy import Row, case, or_, select, and_
 from fastapi import HTTPException, status
 from app.core.status import FriendshipStatus
 
@@ -51,13 +51,22 @@ def friendship_request_create(db: Session, user: models.User, friendship: Friend
     db.refresh(new_friendship)
     return new_friendship
     
-def get_pending_requests(db: Session, user: models.User) -> list[models.Friendship]:
+def get_pending_requests(db: Session, user: models.User) -> list[Row]:
+    # Joined with users so the response carries the requester's name and not
+    # just an id the client would have to look up on its own.
     pending_requests = db.execute(
-        select(models.Friendship).where(
+        select(
+            models.Friendship.requester_id,
+            models.User.username.label("requester_username"),
+            models.Friendship.status,
+        )
+        .join(models.User, models.User.user_id == models.Friendship.requester_id)
+        .where(
             models.Friendship.addressee_id == user.user_id,
             models.Friendship.status == FriendshipStatus.PENDING,
             )
-    ).scalars().all()
+        .order_by(models.User.username)
+    ).all()
     return list(pending_requests)
 
 def get_friends(db: Session, user: models.User) -> list[models.User]:

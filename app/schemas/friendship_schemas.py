@@ -25,6 +25,13 @@ class FriendResponse(BaseModel):
     user_id: int
     username: str
 
+class PendingRequestResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    requester_id: int
+    requester_username: str
+    status: FriendshipStatus
+
+
 
 
 

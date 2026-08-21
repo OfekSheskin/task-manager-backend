@@ -100,8 +100,7 @@ def create_task(db: Session, user: models.User, task: TaskCreate) -> models.Task
         # Called as a guard: raises 404 if the parent is missing, 403 if it is
         # neither owned by this user nor shared with them.
         parent_task = get_task(db, user, task.parent_task_id)
-        # A subtask belongs to the owner of the tree, not to whoever added it,
-        # so a subtask a shared user adds still shows up for the owner.
+
         owner_id = parent_task.owner_id
 
     new_task = models.Task(
