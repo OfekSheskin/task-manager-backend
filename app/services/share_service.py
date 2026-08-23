@@ -8,7 +8,7 @@ from sqlalchemy import  or_, select, and_
 from app.core.status import FriendshipStatus
 
 
-def share_task(db: Session, user: models.User,task_id:int, share:ShareCreate) -> models.TaskShare:
+def share_task(db: Session, user: models.User,task_id:int, share:ShareCreate) -> models.User:
    task= get_owned_task(db,user,task_id)#check if the task exists and user owns it. returns 404 if not.
 
    if task.parent_task_id is not None: # check if the shared task is the root task
@@ -64,8 +64,7 @@ def share_task(db: Session, user: models.User,task_id:int, share:ShareCreate) ->
    )
    db.add(new_share)
    db.commit()
-   db.refresh(new_share)
-   return new_share
+   return shared_user
 
 
 def unshare_task(db: Session, user: models.User, task_id: int, shared_user_id: int) -> None:
@@ -88,10 +87,9 @@ def unshare_task(db: Session, user: models.User, task_id: int, shared_user_id: i
 
 
 def list_shares(db: Session, user: models.User, task_id: int) -> list[models.User]:
-    get_task(db, user, task_id)#404 if the task doesn't exist, 403 if it isn't the user's or shared with them.
+    get_task(db, user, task_id)#check if the user is the owner of the task or shared with it
 
-    # Joined with task_shares so the rows come back as full User entities:
-    # the response needs usernames, not the bare ids stored on the share row.
+#join the task share with the user entity to return and present username on the frontend
     shared_users = db.execute(
         select(models.User)
         .join(models.TaskShare, models.TaskShare.shared_user_id == models.User.user_id)

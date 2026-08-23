@@ -19,6 +19,6 @@ def share_single_task(task_id: int, share: ShareCreate, user: CurrentUser, db: A
 def delete_share(task_id: int, shared_user_id: int, user: CurrentUser, db: Annotated[Session, Depends(get_db)]) -> None:
     return unshare_task(db, user, task_id, shared_user_id)
 
-@router.get("/{task_id}/shares}", response_model= list[ShareUserResponse], status_code= status.HTTP_200_OK)
+@router.get("/{task_id}/shares", response_model= list[ShareUserResponse], status_code= status.HTTP_200_OK)
 def shares(task_id: int, user: CurrentUser,db: Annotated[Session, Depends(get_db)] ):
     return list_shares(db,user,task_id)
