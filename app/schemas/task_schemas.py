@@ -2,6 +2,7 @@ from pydantic import Field
 from datetime import date
 from pydantic import BaseModel, ConfigDict
 from app.core.status import TaskStatus
+from app.schemas.label_schemas import LabelResponse
 
 class TaskBase(BaseModel):
     task_title: str = Field(min_length=1, max_length=255)
@@ -32,3 +33,4 @@ class TaskResponse(TaskBase):
     done_date: date | None
     cancel_reason: str | None
     owner_id: int
+    labels: list[LabelResponse] = []

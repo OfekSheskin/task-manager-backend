@@ -17,4 +17,5 @@ task_labels = Table(
         ForeignKey("labels.label_id", ondelete="CASCADE"),
         primary_key=True,
     ),
+    
 )

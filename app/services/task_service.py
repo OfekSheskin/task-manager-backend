@@ -3,7 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from datetime import date
 from app import models
-from app.schemas.task_schemas import TaskCreate, TaskUpdate
+from app.schemas.task_schemas import TaskCreate, TaskResponse, TaskUpdate
+from app.schemas.label_schemas import LabelResponse
 from app.core.status import TaskStatus
 
 
@@ -239,9 +240,19 @@ def _get_share(db:Session, root_id: int, user_id: int) -> models.TaskShare | Non
      return task_share
 
 
+def to_task_response(task: models.Task, user: models.User) -> TaskResponse:
+    """Serialise a task for one specific user.
 
-    
+    Labels are personal: two users sharing a task each label it for themselves,
+    so the response only ever carries the labels the caller owns. The filtering
+    happens on the response object, never on task.labels itself — removing an
+    item from the relationship would delete the row from task_labels on commit.
+    """
 
-
-
-
+    response = TaskResponse.model_validate(task)
+    response.labels = [
+        LabelResponse.model_validate(label)
+        for label in task.labels
+        if label.user_id == user.user_id
+    ]
+    return response
