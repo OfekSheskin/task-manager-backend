@@ -55,7 +55,7 @@ task_labels_router = APIRouter(prefix="/tasks", tags=["labels"])
     status_code=status.HTTP_201_CREATED,
 )
 def attach_label(task_id: int, label_id: int, user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
-    return to_task_response(add_label_to_task(db, user, task_id, label_id), user)
+    return to_task_response(db, add_label_to_task(db, user, task_id, label_id), user)
 
 
 @task_labels_router.delete(

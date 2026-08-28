@@ -159,6 +159,92 @@ def delete_task(db: Session, user: models.User, task_id: int) -> None:
 
 
 
+def is_blocked(db: Session, task: models.Task) -> bool:
+    # "Blocked" is never stored — it is derived on every read, so finishing a
+    # dependency unblocks everything downstream with no writes at all.
+    #
+    # A task is blocked if it has a dependency that is still To Do, or if any
+    # ancestor is blocked. Climbing the parent chain covers that second half:
+    # asking upwards is what makes blocked state propagate down to subtasks.
+    #
+    # Done and Cancelled dependencies do not block — both are finished states,
+    # matching the subtask check in _apply_status_change.
+    current = task
+    while True:
+        if any(blocker.status == TaskStatus.TO_DO for blocker in current.blockers):
+            return True
+
+        if current.parent_task_id is None:
+            return False
+
+        current = db.get(models.Task, current.parent_task_id)
+
+
+def get_blockers(db: Session, user: models.User, task_id: int) -> list[models.Task]:
+    task = get_task(db, user, task_id)  # 404 if missing, 403 if not visible to this user
+    return task.blockers
+
+
+def add_blocker(
+    db: Session, user: models.User, task_id: int, blocker_id: int
+) -> models.Task:
+    task = get_task(db, user, task_id)
+    blocker = get_task(db, user, blocker_id)
+
+
+    if task.task_id == blocker.task_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A task cannot block itself",
+        )
+
+    if any(existing.task_id == blocker.task_id for existing in task.blockers):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This task is already blocked by that task",
+        )
+
+#check to prevent 2 tasks blocking each other and getting blocked forever
+    if _blocks_transitively(task, blocker):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That task is already blocked by this one, so this would create a cycle",
+        )
+
+  #check an ancestor cannot block its own descendant. The subtask
+
+    if _is_ancestor(db, blocker, task):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A task cannot be blocked by one of its own parent tasks",
+        )
+
+    task.blockers.append(blocker)
+    db.commit()
+    return task
+
+
+def remove_blocker(
+    db: Session, user: models.User, task_id: int, blocker_id: int
+) -> models.Task:
+    task = get_task(db, user, task_id)
+
+    blocker = next(
+        (existing for existing in task.blockers if existing.task_id == blocker_id),
+        None,
+    )
+    if blocker is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This task is not blocked by that task",
+        )
+
+
+    task.blockers.remove(blocker)
+    db.commit()
+    return task
+
+
 #----------------------------------------------------------------------------------------------------------------
 #helper functions --------------------------------------------------------
 
@@ -172,6 +258,14 @@ def _apply_status_change(
             detail="a status cannot be null"
         )
     if new_status == TaskStatus.DONE:
+        #a task held up by an unfinished dependency (its own, or one inherited
+        #from an ancestor) cannot be completed.
+        if is_blocked(db, task):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A blocked task cannot be set to done"
+            )
+
         #check if a task has a subtask whos not done before setting it to done.
         unfinished_child = db.execute(select(models.Task).where(
             models.Task.parent_task_id == task.task_id,
@@ -227,6 +321,33 @@ def _find_root(db: Session, task: models.Task) ->models.Task:
 
 
 
+def _blocks_transitively(task: models.Task, target: models.Task) -> bool:
+    seen = {task.task_id}
+    frontier = [task]
+
+    while frontier:
+        current = frontier.pop()
+        for blocked in current.blocking:
+            if blocked.task_id == target.task_id:
+                return True
+            if blocked.task_id not in seen:
+                seen.add(blocked.task_id)
+                frontier.append(blocked)
+
+    return False
+
+
+#does `candidate` sit somewhere above `task` in the subtask tree?
+def _is_ancestor(db: Session, candidate: models.Task, task: models.Task) -> bool:
+    current = task
+    while current.parent_task_id is not None:
+        if current.parent_task_id == candidate.task_id:
+            return True
+        current = db.get(models.Task, current.parent_task_id)
+
+    return False
+
+
 #try to find the task share the user have for a chosen task
 def _get_share(db:Session, root_id: int, user_id: int) -> models.TaskShare | None:
      task_share = db.execute( 
@@ -240,14 +361,14 @@ def _get_share(db:Session, root_id: int, user_id: int) -> models.TaskShare | Non
      return task_share
 
 
-def to_task_response(task: models.Task, user: models.User) -> TaskResponse:
-    """Serialise a task for one specific user.
+def to_task_response(db: Session, task: models.Task, user: models.User) -> TaskResponse:
+    #Serialise a task for one specific user.
 
-    Labels are personal: two users sharing a task each label it for themselves,
-    so the response only ever carries the labels the caller owns. The filtering
-    happens on the response object, never on task.labels itself — removing an
-    item from the relationship would delete the row from task_labels on commit.
-    """
+    #Labels are personal: two users sharing a task each label it for themselves,
+    #so the response only ever carries the labels the caller owns. The filtering
+    #appens on the response object, never on task.labels itself — removing an
+    #item from the relationship would delete the row from task_labels on commit.
+    
 
     response = TaskResponse.model_validate(task)
     response.labels = [
@@ -255,4 +376,7 @@ def to_task_response(task: models.Task, user: models.User) -> TaskResponse:
         for label in task.labels
         if label.user_id == user.user_id
     ]
+
+    #is_blocked is derived, so it is computed here rather than read off the row.
+    response.is_blocked = is_blocked(db, task)
     return response
