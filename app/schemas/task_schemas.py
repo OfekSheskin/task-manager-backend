@@ -34,3 +34,5 @@ class TaskResponse(TaskBase):
     cancel_reason: str | None
     owner_id: int
     labels: list[LabelResponse] = []
+    # Derived, never stored: computed per request from the blocking graph.
+    is_blocked: bool = False

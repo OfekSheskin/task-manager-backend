@@ -6,6 +6,7 @@ from app.db.base import Base
 from app.core.status import TaskStatus
 from app.models.label import Label
 from app.models.task_label import task_labels
+from app.models.blocking_task import blocking_tasks
 
 
 
@@ -29,4 +30,24 @@ class Task(Base):
 
     labels: Mapped[list[Label]] = relationship(
         secondary=task_labels, lazy="selectin"
+    )
+
+    # Self-referential many-to-many over blocking_tasks. The same table is read
+    # from both directions, so each side has to say explicitly which column it
+    # starts from and which it lands on:
+    #   blockers -> the tasks that hold THIS task up
+    #   blocking -> the tasks THIS task is holding up
+    blockers: Mapped[list["Task"]] = relationship(
+        secondary=blocking_tasks,
+        primaryjoin=lambda: Task.task_id == blocking_tasks.c.blocked_task_id,
+        secondaryjoin=lambda: Task.task_id == blocking_tasks.c.blocking_task_id,
+        back_populates="blocking",
+        lazy="selectin",
+    )
+    blocking: Mapped[list["Task"]] = relationship(
+        secondary=blocking_tasks,
+        primaryjoin=lambda: Task.task_id == blocking_tasks.c.blocking_task_id,
+        secondaryjoin=lambda: Task.task_id == blocking_tasks.c.blocked_task_id,
+        back_populates="blockers",
+        lazy="selectin",
     )
