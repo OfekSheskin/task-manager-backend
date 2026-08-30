@@ -12,6 +12,10 @@ class TaskBase(BaseModel):
 
 class TaskUpdate(BaseModel):
     # Every field is optional: a PATCH body carries only what changes.
+    # extra="forbid" so an unsupported field (parent_task_id, say) answers 422
+    # instead of being dropped in silence and answering 200 with nothing changed.
+    model_config = ConfigDict(extra="forbid")
+
     task_title: str | None = Field(default=None, min_length=1, max_length=255)
     task_info: str | None = None
     status: TaskStatus | None = None

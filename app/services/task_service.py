@@ -258,8 +258,7 @@ def _apply_status_change(
             detail="a status cannot be null"
         )
     if new_status == TaskStatus.DONE:
-        #a task held up by an unfinished dependency (its own, or one inherited
-        #from an ancestor) cannot be completed.
+  
         if is_blocked(db, task):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

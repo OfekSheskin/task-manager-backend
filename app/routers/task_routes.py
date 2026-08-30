@@ -43,8 +43,7 @@ def delete_single_task(task_id: int, user: CurrentUser, db: Annotated[Session, D
     delete_task(db, user, task_id)
 
 
-# Blocking dependencies. The blocker id sits in the path, matching the way
-# labels are attached to a task in label_routes.
+# Blocking dependencies. 
 @router.get("/{task_id}/blockers", response_model=list[TaskResponse], status_code=status.HTTP_200_OK)
 def list_task_blockers(task_id: int, user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
     return [to_task_response(db, blocker, user) for blocker in get_blockers(db, user, task_id)]
