@@ -225,6 +225,25 @@ def add_blocker(
             detail="A task cannot be blocked by one of its own parent tasks",
         )
 
+  #and the same rule going the other way: an unfinished dependency added to a
+  #task that is already done -- or that has a done subtask under it -- would
+  #leave that task done and blocked at once.
+
+    if blocker.status == TaskStatus.TO_DO:
+        already_done = (
+            task
+            if task.status == TaskStatus.DONE
+            else _find_descendant_with_status(db, task, TaskStatus.DONE)
+        )
+        if already_done is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"'{already_done.task_title}' is already done, so it cannot "
+                    "be given an unfinished dependency"
+                ),
+            )
+
     task.blockers.append(blocker)
     db.commit()
     return task
@@ -290,6 +309,20 @@ def _apply_status_change(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A task cannot be set to to do if a task above it is already done"
+            )
+
+        #reopening this task re-blocks everything that depends on it, and being
+        #blocked runs down the subtask tree. Refusing here is what keeps the
+        #rule "a blocked task is never done" true after the fact and not just at
+        #the moment done is set.
+        dependent = _find_done_dependent(db, task)
+        if dependent is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"'{dependent.task_title}' is done and depends on this task; "
+                    "reopen it first"
+                ),
             )
 
         task.done_date = None
@@ -371,6 +404,21 @@ def _find_done_ancestor(db: Session, task: models.Task) -> models.Task | None:
         current = db.get(models.Task, current.parent_task_id)
         if current.status == TaskStatus.DONE:
             return current
+
+    return None
+
+
+#a done task that would be blocked if `task` went back to to do: either one
+#that depends on it directly, or a done task underneath one, since a blocked
+#task passes the block down to its subtasks.
+def _find_done_dependent(db: Session, task: models.Task) -> models.Task | None:
+    for dependent in task.blocking:
+        if dependent.status == TaskStatus.DONE:
+            return dependent
+
+        done_descendant = _find_descendant_with_status(db, dependent, TaskStatus.DONE)
+        if done_descendant is not None:
+            return done_descendant
 
     return None
 
