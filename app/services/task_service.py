@@ -271,12 +271,11 @@ def _apply_status_change(
                 detail="A blocked task cannot be set to done"
             )
 
-        #check if a task has a subtask whos not done before setting it to done.
-        unfinished_child = db.execute(select(models.Task).where(
-            models.Task.parent_task_id == task.task_id,
-            models.Task.status == TaskStatus.TO_DO,
-        )).scalars().first()
-        if unfinished_child is not None:
+        #check the whole subtree, not just the direct children: a cancelled
+        #child can sit between this task and a subtask that is still to do,
+        #and that subtask is just as unfinished for being one level further down.
+        unfinished = _find_descendant_with_status(db, task, TaskStatus.TO_DO)
+        if unfinished is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A task cannot be set to done if one of its children is not done"
@@ -285,15 +284,14 @@ def _apply_status_change(
         return
 
     if new_status == TaskStatus.TO_DO:
-        if task.parent_task_id is None:
-            task.done_date = None
-            return  
-        parent = db.get(models.Task, task.parent_task_id)
-        if parent.status == TaskStatus.DONE:
+        #the whole chain, not just the immediate parent: a cancelled parent can
+        #sit between this task and an ancestor that is already done.
+        if _find_done_ancestor(db, task) is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A task cannot be set to to do if its parent is already done"
+                detail="A task cannot be set to to do if a task above it is already done"
             )
+
         task.done_date = None
         return  
 
@@ -340,6 +338,41 @@ def _blocks_transitively(task: models.Task, target: models.Task) -> bool:
                 frontier.append(blocked)
 
     return False
+
+
+#walks the subtask tree under `task` and returns the first task found with
+#`target` status, or None. One walk serves both directions of the done rule:
+#looking for a to do descendant before completing, and for a done one before
+#blocking or reopening.
+def _find_descendant_with_status(
+    db: Session, task: models.Task, target: TaskStatus
+) -> models.Task | None:
+    frontier = [task.task_id]
+
+    while frontier:
+        children = db.execute(
+            select(models.Task).where(models.Task.parent_task_id.in_(frontier))
+        ).scalars().all()
+
+        for child in children:
+            if child.status == target:
+                return child
+
+        frontier = [child.task_id for child in children]
+
+    return None
+
+
+#the nearest done task above `task`, or None if nothing above it is done.
+def _find_done_ancestor(db: Session, task: models.Task) -> models.Task | None:
+    current = task
+
+    while current.parent_task_id is not None:
+        current = db.get(models.Task, current.parent_task_id)
+        if current.status == TaskStatus.DONE:
+            return current
+
+    return None
 
 
 #does `candidate` sit somewhere above `task` in the subtask tree?
