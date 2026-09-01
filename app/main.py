@@ -26,7 +26,7 @@ app.include_router(task_labels_router)
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Task Manager API", "docs": "/docs"}
 
 
 

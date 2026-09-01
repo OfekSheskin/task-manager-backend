@@ -96,11 +96,6 @@ def friendship_request_or_deny(db: Session, user: models.User, user_id: int, fri
             detail= "the request user and addressee can't be the same person",
         )
 
-    if friendship.status == FriendshipStatus.PENDING:
-         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail= "the friendship is already approved or denied",
-        )
     pending_request = db.execute(
         select(models.Friendship).where(
             models.Friendship.addressee_id == user.user_id,
