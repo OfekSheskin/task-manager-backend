@@ -225,6 +225,16 @@ def add_blocker(
             detail="A task cannot be blocked by one of its own parent tasks",
         )
 
+  #and the mirror of that check: a subtask cannot block a task above it either.
+  #blocked propagates down, so the subtask would inherit the block it created and
+  #could never be set to done - leaving both tasks stuck for good.
+
+    if _is_ancestor(db, task, blocker):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A task cannot be blocked by one of its own subtasks",
+        )
+
   #and the same rule going the other way: an unfinished dependency added to a
   #task that is already done -- or that has a done subtask under it -- would
   #leave that task done and blocked at once.
