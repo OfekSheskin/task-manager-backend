@@ -128,6 +128,12 @@ def update_task(
     for field, value in data.items():
         setattr(existing, field, value)
 
+    # A cancel reason only means anything on a cancelled task. Enforced here,
+    # after the fields are applied, so it holds whatever order they arrived in
+    # and whether or not the caller thought to clear it.
+    if existing.status != TaskStatus.CANCELLED:
+        existing.cancel_reason = None
+
     db.commit()
     return existing
 
