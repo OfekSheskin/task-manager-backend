@@ -1,0 +1,60 @@
+# Blueprint for a full deployment of the project on Render: the Postgres
+# database, this API, and the frontend static site (which lives in its own
+# repository). Creating one Blueprint from this file brings up all three and
+# wires them to each other.
+
+databases:
+  - name: taskmanager-db
+    databaseName: taskmanager
+    user: taskmanager
+    plan: free
+
+services:
+  # The FastAPI service. Migrations run on every boot, so a fresh database is
+  # brought up to the current schema before the app starts serving.
+  - type: web
+    name: taskmanager-api
+    runtime: python
+    plan: free
+    repo: https://github.com/OfekSheskin/task-manager-backend
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      - key: DATABASE_URL
+        fromDatabase:
+          name: taskmanager-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # The frontend's URL. Set at Blueprint creation, because the two services
+      # each need the other's address and one of them has to be filled in by hand.
+      - key: CORS_ORIGINS
+        sync: false
+
+  # The React app, built to static files. The API address is baked in at build
+  # time, which is when Vite substitutes `import.meta.env`.
+  - type: web
+    name: taskmanager-web
+    runtime: static
+    repo: https://github.com/OfekSheskin/task-manager-frontend
+    branch: main
+    buildCommand: npm ci && VITE_API_BASE_URL="https://$API_HOST" npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: API_HOST
+        fromService:
+          name: taskmanager-api
+          type: web
+          property: host
+    # The router runs in the browser, so every path has to be answered with the
+    # single page rather than a 404 from the file server.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

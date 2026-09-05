@@ -26,7 +26,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/your_database
 JWT_SECRET=some-long-random-string
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+CORS_ORIGINS=http://localhost:5173
 ```
+
+`CORS_ORIGINS` is the comma-separated list of sites allowed to call the API; it
+defaults to the Vite dev server, so it can be left out locally. `.env.example`
+holds the same set of keys.
 
 Apply the migrations and start the server:
 
@@ -36,6 +41,21 @@ uvicorn app.main:app --reload
 ```
 
 The API runs on `http://localhost:8000`. Interactive docs are at `/docs`.
+
+## Deployment
+
+`render.yaml` is a Render Blueprint describing the whole system — the Postgres
+database, this API, and the frontend static site from its own repository — so
+one Blueprint brings all three up and points them at each other.
+
+Render supplies `DATABASE_URL` from the managed database and generates
+`JWT_SECRET`; the frontend's build command reads the API's hostname from the
+Blueprint and bakes it into the bundle. The one value that has to be typed is
+`CORS_ORIGINS`, which is the frontend's own URL — the two services each need the
+other's address, so one end of that pair cannot be resolved automatically.
+
+The API runs migrations on boot (`alembic upgrade head` precedes `uvicorn`),
+so a newly created database arrives at the current schema on the first deploy.
 
 ## Project layout
 
