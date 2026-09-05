@@ -1,5 +1,7 @@
 from fastapi import FastAPI 
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.core.config import settings
 from app.routers.auth_routes import router as auth_router
 from app.routers.task_routes import router as task_routes
 from app.routers.friendship_routes import router as friendship_routes
@@ -11,7 +13,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

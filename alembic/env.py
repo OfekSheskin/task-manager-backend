@@ -13,8 +13,9 @@ import app.models  # noqa: F401  — imports every model so autogenerate sees th
 # access to the values within the .ini file in use.
 config = context.config
 
-# The DB URL lives in .env, not in alembic.ini.
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# The DB URL comes from the environment, not from alembic.ini. A `%` in it
+# would start an interpolation in the ini config, so it is escaped on the way in.
+config.set_main_option("sqlalchemy.url", settings.sqlalchemy_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
