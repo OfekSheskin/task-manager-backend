@@ -44,20 +44,32 @@ The API runs on `http://localhost:8000`. Interactive docs are at `/docs`.
 
 ## Deployment
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/OfekSheskin/task-manager-backend)
+The API runs on Vercel and the database is a Neon Postgres project. Both are on
+permanent free plans — nothing expires, and Neon's compute suspends while idle
+and wakes on the next query rather than being torn down.
 
-`render.yaml` is a Render Blueprint describing the whole system — the Postgres
-database, this API, and the frontend static site from its own repository — so
-one Blueprint brings all three up and points them at each other.
+Vercel needs no configuration here: it looks for a `FastAPI` instance named
+`app` at `app/main.py`, installs `requirements.txt`, and serves the whole API as
+one function. `.python-version` pins the interpreter to the version used in
+development.
 
-Render supplies `DATABASE_URL` from the managed database and generates
-`JWT_SECRET`; the frontend's build command reads the API's hostname from the
-Blueprint and bakes it into the bundle. The one value that has to be typed is
-`CORS_ORIGINS`, which is the frontend's own URL — the two services each need the
-other's address, so one end of that pair cannot be resolved automatically.
+Three environment variables are set on the Vercel project:
 
-The API runs migrations on boot (`alembic upgrade head` precedes `uvicorn`),
-so a newly created database arrives at the current schema on the first deploy.
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon's **pooled** connection string |
+| `JWT_SECRET` | a long random string |
+| `CORS_ORIGINS` | the frontend's URL |
+
+Migrations are not run by the deploy — a function has no boot step of its own —
+so they are applied to Neon directly, once per schema change:
+
+```bash
+DATABASE_URL="<neon connection string>" alembic upgrade head
+```
+
+Under Vercel each request gets its own short-lived process, so `session.py`
+drops the connection pool there and lets Neon's pooler do that job instead.
 
 ## Project layout
 
