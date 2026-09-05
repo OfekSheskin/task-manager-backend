@@ -44,6 +44,8 @@ The API runs on `http://localhost:8000`. Interactive docs are at `/docs`.
 
 ## Deployment
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/OfekSheskin/task-manager-backend)
+
 `render.yaml` is a Render Blueprint describing the whole system — the Postgres
 database, this API, and the frontend static site from its own repository — so
 one Blueprint brings all three up and points them at each other.
