@@ -62,11 +62,18 @@ Three environment variables are set on the Vercel project:
 | `CORS_ORIGINS` | the frontend's URL |
 
 Migrations are not run by the deploy — a function has no boot step of its own —
-so they are applied to Neon directly, once per schema change:
+so they are applied to Neon directly, once per schema change. They use the
+**unpooled** connection string, the one whose host has no `-pooler` in it:
 
 ```bash
-DATABASE_URL="<neon connection string>" alembic upgrade head
+DATABASE_URL="<neon unpooled connection string>" alembic upgrade head
 ```
+
+The pooled endpoint is PgBouncer in transaction mode, which hands a different
+backend connection to each transaction. That is right for short request-shaped
+queries and wrong for schema changes — `2d01b63b0cdb` rewrites an enum type, and
+that kind of DDL wants one session it can hold on to. Only migrations need the
+direct endpoint; the running app stays on the pooled one.
 
 Under Vercel each request gets its own short-lived process, so `session.py`
 drops the connection pool there and lets Neon's pooler do that job instead.
